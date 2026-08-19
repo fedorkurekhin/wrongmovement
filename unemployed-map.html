@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unemployed Map — Wrong Movement</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,700;0,900;1,700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg:#0a0a09;
+    --bg-raise:#121210;
+    --fg:#f3f1ec;
+    --fg-dim:#a8a49b;
+    --fg-faint:#5c584f;
+    --accent:#5c6b8a;
+    --line:#2a2823;
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{background:var(--bg);scroll-behavior:smooth;}
+  body{
+    background:var(--bg);
+    color:var(--fg);
+    font-family:'Archivo',sans-serif;
+    font-weight:400;
+    overflow-x:hidden;
+  }
+  ::selection{background:var(--accent);color:var(--bg);}
+  a{color:inherit;}
+  .mono{font-family:'IBM Plex Mono',monospace;letter-spacing:0.04em;}
+
+  #timecode{
+    position:fixed; top:24px; right:24px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px; color:var(--fg-faint);
+    letter-spacing:0.08em; z-index:50;
+    mix-blend-mode:difference; pointer-events:none;
+  }
+  @media (max-width:640px){ #timecode{ top:16px; right:16px; font-size:10px; } }
+
+  nav{
+    position:fixed; top:24px; left:24px; z-index:50;
+    font-family:'Archivo',sans-serif; font-weight:700;
+    font-size:14px; letter-spacing:0.02em;
+    mix-blend-mode:difference; color:var(--fg);
+    text-decoration:none;
+    display:flex; align-items:center; gap:8px;
+  }
+  @media (max-width:640px){ nav{ top:16px; left:16px; font-size:12px; } }
+
+  .hero{
+    min-height:56vh;
+    display:flex; flex-direction:column; justify-content:center;
+    padding:0 6vw;
+  }
+  .hero-eyebrow{font-size:13px;color:var(--fg-dim);margin-bottom:18px;}
+  .hero h1{
+    font-weight:900;
+    font-size:clamp(44px,9vw,120px);
+    line-height:0.94;
+    letter-spacing:-0.01em;
+  }
+  .hero p.tagline{
+    max-width:640px; margin-top:26px;
+    font-size:clamp(15px,1.6vw,19px);
+    line-height:1.6; color:var(--fg-dim);
+  }
+  .status-row{
+    margin-top:28px;
+    display:flex; align-items:center; gap:12px;
+  }
+  .status-row .status{
+    display:inline-block; padding:5px 12px;
+    border:1px solid var(--fg-faint);
+    font-size:11px; letter-spacing:0.06em;
+  }
+
+  .map-wrap{
+    padding:4vw 6vw 6vw;
+    border-top:1px solid var(--line);
+  }
+  .map-caption{
+    font-size:12px; color:var(--fg-faint);
+    margin-bottom:24px;
+  }
+  svg.worldmap{ width:100%; height:auto; display:block; }
+  .graticule{ stroke:var(--line); stroke-width:1; fill:none; }
+  .landmass{ fill:var(--bg-raise); stroke:var(--fg-faint); stroke-width:1; }
+  .pin{ fill:var(--fg); }
+  .pin-ring{
+    fill:none; stroke:var(--fg); stroke-width:1;
+    opacity:0.5;
+    transform-origin:center;
+    transform-box:fill-box;
+    animation:pulse 2.8s ease-out infinite;
+  }
+  @keyframes pulse{
+    0%{ transform:scale(1); opacity:0.6; }
+    100%{ transform:scale(3.2); opacity:0; }
+  }
+  .pin-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:9px;
+    fill:var(--fg-dim);
+  }
+  .pin-group:hover .pin-label{ fill:var(--fg); }
+  .pin-group:hover .pin{ fill:var(--accent); }
+
+  .how{
+    padding:6vw 6vw 8vw;
+    border-top:1px solid var(--line);
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:40px;
+  }
+  @media (max-width:860px){ .how{ grid-template-columns:1fr; gap:32px; } }
+  .how-item .num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px; color:var(--fg-faint);
+    display:block; margin-bottom:12px;
+  }
+  .how-item h3{
+    font-weight:700; font-size:20px; margin-bottom:10px;
+  }
+  .how-item p{
+    font-size:14px; line-height:1.6; color:var(--fg-dim);
+    max-width:34ch;
+  }
+
+  .cta{
+    padding:8vw 6vw 10vw;
+    border-top:1px solid var(--line);
+  }
+  .cta .lede{
+    font-size:clamp(22px,3.6vw,38px);
+    line-height:1.3; font-weight:500;
+    max-width:24ch; margin-bottom:32px;
+  }
+  .cta-row{ display:flex; flex-wrap:wrap; gap:16px; align-items:center; }
+  .cta .btn{
+    display:inline-block; padding:12px 22px;
+    border:1px solid var(--fg); color:var(--fg);
+    text-decoration:none; font-size:13px;
+    letter-spacing:0.06em;
+    transition:background 0.2s ease, color 0.2s ease;
+  }
+  .cta .btn:hover{ background:var(--fg); color:var(--bg); }
+  .cta .note{ font-size:12px; color:var(--fg-faint); }
+
+  footer{
+    padding:6vw 6vw 6vw;
+    border-top:1px solid var(--line);
+    font-size:13px; color:var(--fg-dim);
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px;
+  }
+  footer a{ text-decoration:none; border-bottom:1px solid transparent; }
+  footer a:hover{ border-color:var(--fg); color:var(--fg); }
+
+  :focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+</style>
+</head>
+<body>
+
+<a href="index.html" class="mono" style="text-decoration:none;">
+  <nav>← WRONG MOVEMENT</nav>
+</a>
+<div id="timecode" class="mono">00:00:00:00</div>
+
+<section class="hero">
+  <div class="hero-eyebrow mono">Wrong Movement — Community Tool</div>
+  <h1>Unemployed<br>Map</h1>
+  <p class="tagline">A map where any unemployed film or performance worker can drop a pin and register themselves as available for work — director, gaffer, seamstress, dramaturg, anyone between projects.</p>
+  <div class="status-row">
+    <span class="status mono">COMING SOON</span>
+    <span class="mono" style="font-size:12px;color:var(--fg-faint);">Preview below is illustrative — no real pins yet.</span>
+  </div>
+</section>
+
+<div class="map-wrap">
+  <div class="map-caption mono">PREVIEW — SAMPLE PINS, NOT REAL REGISTRATIONS</div>
+  <svg class="worldmap" viewBox="0 0 1000 500" xmlns="http://www.w3.org/2000/svg">
+    <!-- graticule -->
+    <g class="graticule">
+      <line x1="0" y1="83" x2="1000" y2="83"></line>
+      <line x1="0" y1="166" x2="1000" y2="166"></line>
+      <line x1="0" y1="250" x2="1000" y2="250"></line>
+      <line x1="0" y1="333" x2="1000" y2="333"></line>
+      <line x1="0" y1="416" x2="1000" y2="416"></line>
+      <line x1="125" y1="0" x2="125" y2="500"></line>
+      <line x1="250" y1="0" x2="250" y2="500"></line>
+      <line x1="375" y1="0" x2="375" y2="500"></line>
+      <line x1="500" y1="0" x2="500" y2="500"></line>
+      <line x1="625" y1="0" x2="625" y2="500"></line>
+      <line x1="750" y1="0" x2="750" y2="500"></line>
+      <line x1="875" y1="0" x2="875" y2="500"></line>
+    </g>
+
+    <!-- stylised landmasses (abstract, not geographically precise) -->
+    <g class="landmass">
+      <!-- North America -->
+      <path d="M 95,95 Q 150,70 210,85 Q 260,95 275,130 Q 290,160 260,190 Q 230,215 200,205 Q 165,230 150,210 Q 120,215 105,180 Q 85,150 95,95 Z"></path>
+      <!-- South America -->
+      <path d="M 235,270 Q 270,260 290,285 Q 310,320 300,365 Q 295,410 270,435 Q 250,420 245,385 Q 225,340 225,300 Q 225,280 235,270 Z"></path>
+      <!-- Europe -->
+      <path d="M 470,90 Q 510,78 545,90 Q 565,100 560,120 Q 555,140 530,145 Q 500,150 480,135 Q 462,115 470,90 Z"></path>
+      <!-- Africa -->
+      <path d="M 480,155 Q 530,145 565,165 Q 585,190 580,230 Q 578,280 555,330 Q 535,370 510,365 Q 495,330 490,290 Q 470,240 470,195 Q 470,170 480,155 Z"></path>
+      <!-- Asia -->
+      <path d="M 570,75 Q 650,60 730,75 Q 810,85 850,120 Q 870,150 840,175 Q 800,195 750,185 Q 700,210 650,195 Q 610,205 585,175 Q 560,140 565,105 Q 565,85 570,75 Z"></path>
+      <!-- Australia -->
+      <path d="M 800,330 Q 850,320 880,340 Q 900,360 885,385 Q 855,400 820,390 Q 795,375 795,350 Q 795,338 800,330 Z"></path>
+    </g>
+
+    <!-- city pins -->
+    <g class="pins mono"></g>
+  </svg>
+</div>
+
+<div class="how">
+  <div class="how-item">
+    <span class="num mono">01</span>
+    <h3>Drop a pin</h3>
+    <p>Mark your city and your discipline — directing, camera, sound, costume, dramaturgy, whatever you do.</p>
+  </div>
+  <div class="how-item">
+    <span class="num mono">02</span>
+    <h3>Say what you're free for</h3>
+    <p>A line on what you can jump into right now — a shoot, a show, a favor, a collaboration.</p>
+  </div>
+  <div class="how-item">
+    <span class="num mono">03</span>
+    <h3>Get found</h3>
+    <p>Anyone scrolling the map can see who's around and idle, and reach out directly.</p>
+  </div>
+</div>
+
+<div class="cta">
+  <div class="lede">Not live yet — but if you want to be first on the map, say so.</div>
+  <div class="cta-row">
+    <a class="btn" href="mailto:hello@wrongmovement.film?subject=Unemployed%20Map">GET NOTIFIED ↗</a>
+    <span class="note mono">hello@wrongmovement.film</span>
+  </div>
+</div>
+
+<footer>
+  <a href="index.html">← Back to Wrong Movement</a>
+  <span class="mono">BERLIN</span>
+</footer>
+
+<script>
+  const tc = document.getElementById('timecode');
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function updateTimecode(){
+    const doc = document.documentElement;
+    const scrolled = doc.scrollTop;
+    const max = doc.scrollHeight - doc.clientHeight;
+    const pct = max > 0 ? scrolled / max : 0;
+    const totalFrames = Math.floor(pct * 24 * 180);
+    const frames = totalFrames % 24;
+    const totalSeconds = Math.floor(totalFrames / 24);
+    const seconds = totalSeconds % 60;
+    const minutes = Math.floor(totalSeconds / 60);
+    tc.textContent = `00:${pad(minutes)}:${pad(seconds)}:${pad(frames)}`;
+  }
+  document.addEventListener('scroll', updateTimecode, {passive:true});
+  updateTimecode();
+
+  // sample pins — illustrative only
+  const pins = [
+    {x:537, y:104, label:"DIRECTOR · BERLIN"},
+    {x:624, y:134, label:"DRAMATURG · TBILISI"},
+    {x:580, y:136, label:"CAMERA · ISTANBUL"},
+    {x:557, y:125, label:"SOUND · BELGRADE"},
+    {x:506, y:114, label:"EDITOR · PARIS"},
+    {x:294, y:139, label:"PRODUCER · NEW YORK"},
+    {x:338, y:346, label:"ACTOR · BUENOS AIRES"},
+    {x:597, y:161, label:"COSTUME · TEL AVIV"},
+  ];
+  const svgns = "http://www.w3.org/2000/svg";
+  const g = document.querySelector('.pins');
+  pins.forEach((p, i) => {
+    const group = document.createElementNS(svgns, 'g');
+    group.setAttribute('class', 'pin-group');
+    group.style.cursor = 'default';
+
+    const ring = document.createElementNS(svgns, 'circle');
+    ring.setAttribute('class', 'pin-ring');
+    ring.setAttribute('cx', p.x);
+    ring.setAttribute('cy', p.y);
+    ring.setAttribute('r', 4);
+    ring.style.animationDelay = (i * 0.3) + 's';
+
+    const dot = document.createElementNS(svgns, 'circle');
+    dot.setAttribute('class', 'pin');
+    dot.setAttribute('cx', p.x);
+    dot.setAttribute('cy', p.y);
+    dot.setAttribute('r', 3);
+
+    const label = document.createElementNS(svgns, 'text');
+    label.setAttribute('class', 'pin-label');
+    label.setAttribute('x', p.x + 7);
+    label.setAttribute('y', p.y - 6);
+    label.textContent = p.label;
+
+    group.appendChild(ring);
+    group.appendChild(dot);
+    group.appendChild(label);
+    g.appendChild(group);
+  });
+</script>
+
+</body>
+</html>
